@@ -1,0 +1,107 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        description: Remove trailing whitespace
+      - id: end-of-file-fixer
+        description: Ensure files end with newline
+      - id: check-yaml
+        description: Check YAML syntax
+      - id: check-added-large-files
+        description: Prevent large files from being committed
+        args: ['--maxkb=10000']
+      - id: check-merge-conflict
+        description: Check for merge conflicts
+      - id: check-case-conflict
+        description: Check for case conflicts
+      - id: check-json
+        description: Check JSON syntax
+      - id: pretty-format-json
+        description: Pretty format JSON files
+        args: ['--autofix', '--no-sort-keys', '--indent=4']
+      - id: mixed-line-ending
+        description: Check for mixed line endings
+        args: ['--fix=lf']
+
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        description: Format Go code
+        entry: gofmt
+        language: system
+        args: [-w]
+        files: \.go$
+
+      - id: go-vet
+        name: go vet
+        description: Go static analysis
+        entry: go vet
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: go-mod-tidy
+        name: go mod tidy
+        description: Tidy Go module dependencies
+        entry: go mod tidy
+        language: system
+        files: (go\.mod|go\.sum)$
+        pass_filenames: false
+
+      - id: golangci-lint
+        name: golangci-lint
+        description: Go linting
+        entry: golangci-lint run --fix
+        language: system
+        files: \.go$
+        pass_filenames: false
+
+      - id: gosec
+        name: gosec security scan
+        description: Go security scanning
+        entry: gosec
+        language: system
+        files: \.go$
+        args: [-quiet, ./...]
+        pass_filenames: false
+
+      - id: go-test
+        name: go test
+        description: Run Go tests
+        entry: go test
+        language: system
+        files: \.go$
+        args: [-v, ./...]
+        pass_filenames: false
+
+      - id: go-build
+        name: go build
+        description: Verify Go code builds
+        entry: go build
+        language: system
+        files: \.go$
+        args: [-o, /dev/null, ./...]
+        pass_filenames: false
+
+      - id: docker-compose-check
+        name: docker-compose config check
+        description: Validate docker-compose configuration
+        entry: docker-compose
+        language: system
+        files: docker-compose.*\.ya?ml$
+        args: [-f, deployments/docker-compose/docker-compose.yml, config, -q]
+        pass_filenames: false
+
+      - id: yaml-lint
+        name: yamllint
+        description: YAML linting
+        entry: yamllint
+        language: system
+        files: \.ya?ml$
+        args: [-c, .yamllint.yml]
+
+# Default configuration for pre-commit
+default_stages: [commit]
+fail_fast: false

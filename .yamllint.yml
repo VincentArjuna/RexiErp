@@ -1,0 +1,74 @@
+---
+extends: default
+
+rules:
+  # 80 chars should be enough, but don't fail if a line is longer
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  # allow tabs and mixed content
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # commented-out code should not be flagged
+  comments:
+    min-spaces-from-content: 1
+
+  # allow empty lines at the beginning of the file
+  document-start:
+    present: true
+
+  # don't bother with trailing spaces
+  trailing-spaces: enable
+
+  # allow key duplication for merging (YAML merges)
+  key-duplicates: enable
+
+  # octal values are allowed
+  octal-values:
+    forbid-implicit-octal: false
+    forbid-explicit-octal: false
+
+  # braces should be spaced correctly
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # brackets should be spaced correctly
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # colons should be spaced correctly
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  # commas should be spaced correctly
+  commas:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  # don't enforce empty lines between block-level items
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  # truthy values should not be quoted
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+    check-keys: true
+
+ignore: |
+  .git/
+  vendor/
+  .venv/
+  *.egg-info/
+  .pytest_cache/
+  node_modules/
+  .tox/

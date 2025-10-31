@@ -1,0 +1,66 @@
+# RexiERP Local Development Configuration
+# This file contains configuration for local development environment
+
+app:
+  name: "RexiERP"
+  version: "1.0.0"
+  environment: "development"
+  debug: true
+  host: "0.0.0.0"
+  port: 8000
+  timezone: "Asia/Jakarta"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "rexi_erp"
+  user: "rexi"
+  password: "password"
+  ssl_mode: "disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: "300s"
+  conn_max_idle_time: "60s"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+
+rabbitmq:
+  host: "localhost"
+  port: 5672
+  user: "guest"
+  password: "guest"
+  vhost: "/"
+  max_retries: 3
+  retry_delay: "5s"
+  heartbeat: "10s"
+  connection_timeout: "30s"
+
+jwt:
+  secret: "your-super-secret-jwt-key-for-development-only-change-in-production"
+  expiration_hours: 24
+  issuer: "RexiERP"
+  refresh_token_days: 7
+  access_token_ttl: "24h"
+
+log:
+  level: "debug"
+  format: "json"
+  output: "stdout"
+  max_size: 100
+  max_age: 7
+  max_backups: 3
+  compress: true
+
+monitoring:
+  enabled: true
+  port: 9000
+  path: "/metrics"
+  metrics_url: ""
+
+# Service-specific configurations would be loaded by each service
+# For example, authentication service would load auth.yaml, etc.
