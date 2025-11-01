@@ -22,6 +22,69 @@
 -hasMany UserSessions
 -hasMany ActivityLogs
 
+## UserSessions
+
+**Purpose:** JWT session management with Redis-based token blacklisting for multi-tenant authentication security
+
+**Key Attributes:**
+- id: UUID - Primary identifier
+- user_id: UUID - Foreign key to Users table
+- tenant_id: UUID - Multi-tenant isolation
+- session_id: string - Unique session identifier
+- token_hash: string - Hashed JWT token for blacklisting
+- refresh_token_hash: string - Hashed refresh token
+- device_info: json - Device fingerprinting data
+- ip_address: string - Client IP address for security tracking
+- user_agent: string - Browser/client identification
+- expires_at: timestamp - Token expiration time
+- last_activity: timestamp - Session activity tracking
+- is_active: boolean - Session status (true=active, false=revoked)
+- created_at: timestamp - Session creation
+- updated_at: timestamp - Last modification
+
+**Relationships:**
+- belongsTo User (user_id)
+- belongsTo Tenant (tenant_id)
+
+**Indexes:**
+- Unique index on session_id
+- Index on user_id for user session lookups
+- Index on token_hash for blacklisting checks
+- Index on expires_at for cleanup operations
+
+## ActivityLogs
+
+**Purpose:** Security audit trail for all user actions with multi-tenant context and compliance tracking
+
+**Key Attributes:**
+- id: UUID - Primary identifier
+- user_id: UUID - Foreign key to Users table (nullable for system actions)
+- tenant_id: UUID - Multi-tenant isolation
+- action: string - Action performed (login, logout, create, update, delete, etc.)
+- resource_type: string - Type of resource affected (user, product, customer, etc.)
+- resource_id: UUID - ID of affected resource (nullable)
+- old_values: json - Previous state for audit (nullable)
+- new_values: json - New state for audit (nullable)
+- ip_address: string - Client IP address for security tracking
+- user_agent: string - Browser/client identification
+- session_id: string - Related session identifier
+- success: boolean - Action success status
+- error_message: string - Error details if action failed (nullable)
+- context: json - Additional context data (tenant context, request details, etc.)
+- created_at: timestamp - Activity timestamp
+
+**Relationships:**
+- belongsTo User (user_id, nullable)
+- belongsTo Tenant (tenant_id)
+
+**Indexes:**
+- Index on user_id for user activity lookups
+- Index on tenant_id for multi-tenant queries
+- Index on action for activity type filtering
+- Index on resource_type + resource_id for resource tracking
+- Index on created_at for time-based queries
+- Composite index on (tenant_id, created_at) for tenant audit reports
+
 ## Tenants
 
 **Purpose:** Multi-tenant management for Indonesian MSME customers with company-specific data isolation

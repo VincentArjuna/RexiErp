@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/VincentArjuna/RexiErp/internal/shared/config"
 )
@@ -26,21 +26,28 @@ type Database struct {
 
 // NewDatabase creates a new database connection with optimized pooling
 func NewDatabase(cfg *config.DatabaseConfig, logger *logrus.Logger) (*Database, error) {
-	dsn := cfg.GetDSN()
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Host,
+		cfg.Port,
+		cfg.User,
+		cfg.Password,
+		cfg.Name,
+		cfg.SSLMode,
+	)
 
 	// Configure GORM logger
-	gormLogger := logger.New()
-	logLevel := logger.Silent
+	var logLevel gormlogger.LogLevel
 	if logger.Level == logrus.DebugLevel {
-		logLevel = logger.Info
+		logLevel = gormlogger.Info
+	} else {
+		logLevel = gormlogger.Silent
 	}
-	gormLogger.SetLevel(logLevel)
 
 	// Open GORM connection with PostgreSQL driver
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.New(
+		Logger: gormlogger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			logger.Config{
+			gormlogger.Config{
 				SlowThreshold:             200 * time.Millisecond,
 				LogLevel:                  logLevel,
 				IgnoreRecordNotFoundError: true,
@@ -167,12 +174,12 @@ func (d *Database) HealthCheck() error {
 
 // BeginTx starts a new transaction with the given options
 func (d *Database) BeginTx(opts *sql.TxOptions) (*gorm.DB, error) {
-	return d.DB.Begin(opts)
+	return d.DB.Begin(opts), nil
 }
 
 // GetTenantDB returns a database connection scoped to the specified tenant
-func (d *Database) GetTenantDB(tenantID string) *gorm.DB {
+func (d *Database) GetTenantDB(tenantID string) (*gorm.DB, error) {
 	// Implement tenant isolation by setting search_path or schema
 	// This is a placeholder for tenant-specific database configuration
-	return d.DB.WithContext(context.WithValue(context.Background(), "tenant_id", tenantID))
+	return d.DB.WithContext(context.WithValue(context.Background(), "tenant_id", tenantID)), nil
 }
