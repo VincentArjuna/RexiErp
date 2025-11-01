@@ -145,14 +145,14 @@ docker-build: ## Build Docker images for all services
 
 docker-clean: ## Clean Docker resources
 	@echo "$(BLUE)Cleaning Docker resources...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) down -v --remove-orphans
+	@docker compose -f $(DOCKER_COMPOSE_FILE) down -v --remove-orphans
 	@docker system prune -f
 	@echo "$(GREEN)Docker cleanup completed!$(RESET)"
 
 # Docker Compose Commands
 up: ## Start all services with Docker Compose
 	@echo "$(BLUE)Starting all services...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) up -d
+	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@echo "$(GREEN)Services started successfully!$(RESET)"
 	@echo "$(CYAN)Services available at:$(RESET)"
 	@echo "$(YELLOW)- API Gateway: http://localhost:8080$(RESET)"
@@ -162,11 +162,11 @@ up: ## Start all services with Docker Compose
 
 down: ## Stop all services with Docker Compose
 	@echo "$(BLUE)Stopping all services...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) down
+	@docker compose -f $(DOCKER_COMPOSE_FILE) down
 	@echo "$(GREEN)Services stopped successfully!$(RESET)"
 
 logs: ## Show logs from all services
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) logs -f
+	@docker compose -f $(DOCKER_COMPOSE_FILE) logs -f
 
 logs-service: ## Show logs from a specific service (usage: make logs-service SERVICE=postgres)
 	@if [ -z "$(SERVICE)" ]; then \
@@ -175,16 +175,16 @@ logs-service: ## Show logs from a specific service (usage: make logs-service SER
 		exit 1; \
 	fi
 	@echo "$(BLUE)Showing logs for $(SERVICE)...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) logs -f $(SERVICE)
+	@docker compose -f $(DOCKER_COMPOSE_FILE) logs -f $(SERVICE)
 
 restart: ## Restart all services
 	@echo "$(BLUE)Restarting all services...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) restart
+	@docker compose -f $(DOCKER_COMPOSE_FILE) restart
 	@echo "$(GREEN)Services restarted successfully!$(RESET)"
 
 status: ## Show status of all services
 	@echo "$(BLUE)Service status:$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) ps
+	@docker compose -f $(DOCKER_COMPOSE_FILE) ps
 
 # Database Commands
 migrate-up: ## Run database migrations
@@ -239,7 +239,7 @@ version: ## Show version information
 	@echo "$(CYAN)RexiERP Information:$(RESET)"
 	@echo "$(YELLOW)Go Version:$(RESET) $(shell go version)"
 	@echo "$(YELLOW)Docker Version:$(RESET) $(shell docker --version)"
-	@echo "$(YELLOW)Docker Compose Version:$(RESET) $(shell docker-compose --version)"
+	@echo "$(YELLOW)Docker Compose Version:$(RESET) $(shell docker compose version)"
 
 check-deps: ## Check for outdated dependencies
 	@echo "$(BLUE)Checking for outdated dependencies...$(RESET)"
@@ -270,7 +270,7 @@ quick-test: fmt test ## Format and run tests
 # Backup and Restore Commands
 backup-db: ## Backup database
 	@echo "$(BLUE)Creating database backup...$(RESET)"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) exec -T postgres pg_dump -U rexi rexi_erp > backup_$(shell date +%Y%m%d_%H%M%S).sql
+	@docker compose -f $(DOCKER_COMPOSE_FILE) exec -T postgres pg_dump -U rexi rexi_erp > backup_$(shell date +%Y%m%d_%H%M%S).sql
 	@echo "$(GREEN)Database backup created!$(RESET)"
 
 # Environment Commands

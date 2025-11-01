@@ -1,3 +1,138 @@
-.bmad-core
-.claude
-.ignore
+# BMAD Core and AI Tools
+.bmad-core/
+.claude/
+.ignore/
+
+# Go
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Go module cache
+go.sum.backup
+
+# Build artifacts
+bin/
+build/
+dist/
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Environment and configuration files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+.env.backup
+*.env
+
+# Logs
+*.log
+logs/
+log/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+*.sql.backup
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js (if any frontend tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Terraform (Phase 2)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+tfplan
+crash.log
+override.tf
+
+# Kubernetes secrets (Phase 2)
+secrets/
+*.key
+*.crt
+*.pem
+
+# Backup files
+*.backup
+*.bak
+backup_*.sql
+
+# Test and coverage
+test-results/
+coverage/
+*.cover
+
+# Monitoring and metrics
+prometheus_data/
+grafana_data/
+
+# Local development
+.local/
+local_data/
+
+# Documentation build
+docs/_build/
+docs/build/
+
+# Security and secrets
+*.p12
+*.pfx
+*.keytab
+id_rsa*
+*.pem
+*.crt
+
+# Air live reload
+tmp/
