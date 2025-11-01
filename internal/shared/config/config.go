@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -16,6 +17,7 @@ type Config struct {
 	Redis    RedisConfig    `yaml:"redis"`
 	RabbitMQ RabbitMQConfig `yaml:"rabbitmq"`
 	JWT      JWTConfig      `yaml:"jwt"`
+	APIKey   APIKeyConfig   `yaml:"api_key"`
 	Log      LogConfig      `yaml:"log"`
 	Monitoring MonitoringConfig `yaml:"monitoring"`
 }
@@ -76,6 +78,48 @@ type JWTConfig struct {
 	AccessTokenTTL   time.Duration `yaml:"access_token_ttl"`
 }
 
+// APIKeyConfig represents API key configuration
+type APIKeyConfig struct {
+	Enabled    bool     `yaml:"enabled"`
+	Keys       []string `yaml:"keys"`
+	HeaderName string   `yaml:"header_name"`
+}
+
+// Validate validates the database configuration
+func (c *DatabaseConfig) Validate() error {
+	// Validate connection pool settings
+	if c.MaxOpenConns <= 0 {
+		return fmt.Errorf("max open connections must be greater than 0")
+	}
+	if c.MaxOpenConns > 1000 {
+		return fmt.Errorf("max open connections (%d) is too high, maximum recommended is 1000", c.MaxOpenConns)
+	}
+
+	if c.MaxIdleConns < 0 {
+		return fmt.Errorf("max idle connections cannot be negative")
+	}
+	if c.MaxIdleConns > c.MaxOpenConns {
+		return fmt.Errorf("max idle connections (%d) cannot be greater than max open connections (%d)", c.MaxIdleConns, c.MaxOpenConns)
+	}
+
+	// Validate connection lifetime settings
+	if c.ConnMaxLifetime <= 0 {
+		return fmt.Errorf("connection max lifetime must be greater than 0")
+	}
+	if c.ConnMaxLifetime > 24*time.Hour {
+		return fmt.Errorf("connection max lifetime (%v) is too long, maximum recommended is 24 hours", c.ConnMaxLifetime)
+	}
+
+	if c.ConnMaxIdleTime <= 0 {
+		return fmt.Errorf("connection max idle time must be greater than 0")
+	}
+	if c.ConnMaxIdleTime > c.ConnMaxLifetime {
+		return fmt.Errorf("connection max idle time (%v) cannot be greater than connection max lifetime (%v)", c.ConnMaxIdleTime, c.ConnMaxLifetime)
+	}
+
+	return nil
+}
+
 // LogConfig represents logging configuration
 type LogConfig struct {
 	Level      string `yaml:"level"`
@@ -114,10 +158,10 @@ func LoadConfig() (*Config, error) {
 			User:            getEnv("DB_USER", "rexi"),
 			Password:        getEnv("DB_PASSWORD", "password"),
 			SSLMode:         getEnv("DB_SSL_MODE", "disable"),
-			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNECTIONS", 25),
-			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNECTIONS", 5),
-			ConnMaxLifetime: getEnvDuration("DB_CONNECTION_MAX_LIFETIME", 300*time.Second),
-			ConnMaxIdleTime: getEnvDuration("DB_CONNECTION_MAX_IDLE_TIME", 60*time.Second),
+			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNECTIONS", 50),
+			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNECTIONS", 10),
+			ConnMaxLifetime: getEnvDuration("DB_CONNECTION_MAX_LIFETIME", 1*time.Hour),
+			ConnMaxIdleTime: getEnvDuration("DB_CONNECTION_MAX_IDLE_TIME", 30*time.Minute),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),
@@ -143,6 +187,11 @@ func LoadConfig() (*Config, error) {
 			Issuer:           getEnv("JWT_ISSUER", "RexiERP"),
 			RefreshTokenDays: getEnvInt("JWT_REFRESH_TOKEN_DAYS", 7),
 			AccessTokenTTL:   getEnvDuration("JWT_ACCESS_TOKEN_TTL", 24*time.Hour),
+		},
+		APIKey: APIKeyConfig{
+			Enabled:    getEnvBool("API_KEY_AUTH_ENABLED", true),
+			Keys:       getEnvSlice("API_KEYS", []string{"rexierp-api-key-2024-dev"}),
+			HeaderName: getEnv("API_KEY_HEADER", "X-API-Key"),
 		},
 		Log: LogConfig{
 			Level:      getEnv("LOG_LEVEL", "info"),
@@ -200,6 +249,11 @@ func (c *Config) validate() error {
 	}
 	if c.RabbitMQ.Port < 1 || c.RabbitMQ.Port > 65535 {
 		return fmt.Errorf("invalid rabbitmq port: %d", c.RabbitMQ.Port)
+	}
+
+	// Validate database connection settings
+	if err := c.Database.Validate(); err != nil {
+		return fmt.Errorf("database configuration validation failed: %w", err)
 	}
 
 	return nil
@@ -292,6 +346,13 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		if duration, err := time.ParseDuration(value); err == nil {
 			return duration
 		}
+	}
+	return defaultValue
+}
+
+func getEnvSlice(key string, defaultValue []string) []string {
+	if value := os.Getenv(key); value != "" {
+		return strings.Split(value, ",")
 	}
 	return defaultValue
 }

@@ -302,4 +302,191 @@ func TestConfigHelperFunctions(t *testing.T) {
 		result := getEnvDuration("TEST_DURATION", 10*time.Minute)
 		assert.Equal(t, 10*time.Minute, result)
 	})
+
+	t.Run("getEnvSlice with comma-separated values", func(t *testing.T) {
+		os.Setenv("TEST_SLICE", "item1,item2,item3")
+		defer os.Unsetenv("TEST_SLICE")
+
+		result := getEnvSlice("TEST_SLICE", []string{"default"})
+		assert.Equal(t, []string{"item1", "item2", "item3"}, result)
+	})
+
+	t.Run("getEnvSlice with default", func(t *testing.T) {
+		result := getEnvSlice("NON_EXISTENT_SLICE", []string{"default"})
+		assert.Equal(t, []string{"default"}, result)
+	})
+}
+
+func TestDatabaseConfigValidate(t *testing.T) {
+	testCases := []struct {
+		name        string
+		config      DatabaseConfig
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "valid configuration",
+			config: DatabaseConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 1 * time.Hour,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: false,
+		},
+		{
+			name: "zero max open connections",
+			config: DatabaseConfig{
+				MaxOpenConns:    0,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 1 * time.Hour,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: true,
+			errorMsg:    "max open connections must be greater than 0",
+		},
+		{
+			name: "max open connections too high",
+			config: DatabaseConfig{
+				MaxOpenConns:    1500,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 1 * time.Hour,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: true,
+			errorMsg:    "max open connections (1500) is too high",
+		},
+		{
+			name: "negative max idle connections",
+			config: DatabaseConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    -1,
+				ConnMaxLifetime: 1 * time.Hour,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: true,
+			errorMsg:    "max idle connections cannot be negative",
+		},
+		{
+			name: "max idle connections greater than max open",
+			config: DatabaseConfig{
+				MaxOpenConns:    10,
+				MaxIdleConns:    20,
+				ConnMaxLifetime: 1 * time.Hour,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: true,
+			errorMsg:    "max idle connections (20) cannot be greater than max open connections (10)",
+		},
+		{
+			name: "zero connection max lifetime",
+			config: DatabaseConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 0,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: true,
+			errorMsg:    "connection max lifetime must be greater than 0",
+		},
+		{
+			name: "connection max lifetime too long",
+			config: DatabaseConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 48 * time.Hour,
+				ConnMaxIdleTime: 30 * time.Minute,
+			},
+			expectError: true,
+			errorMsg:    "too long, maximum recommended is 24 hours",
+		},
+		{
+			name: "zero connection max idle time",
+			config: DatabaseConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 1 * time.Hour,
+				ConnMaxIdleTime: 0,
+			},
+			expectError: true,
+			errorMsg:    "connection max idle time must be greater than 0",
+		},
+		{
+			name: "connection max idle time greater than max lifetime",
+			config: DatabaseConfig{
+				MaxOpenConns:    50,
+				MaxIdleConns:    10,
+				ConnMaxLifetime: 30 * time.Minute,
+				ConnMaxIdleTime: 1 * time.Hour,
+			},
+			expectError: true,
+			errorMsg:    "cannot be greater than connection max lifetime",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.config.Validate()
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorMsg != "" {
+					assert.Contains(t, err.Error(), tc.errorMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestLoadConfigWithAPIKeySettings(t *testing.T) {
+	testCases := []struct {
+		name       string
+		envVars    map[string]string
+		wantConfig APIKeyConfig
+	}{
+		{
+			name: "default API key settings",
+			envVars: map[string]string{},
+			wantConfig: APIKeyConfig{
+				Enabled:    true,
+				Keys:       []string{"rexierp-api-key-2024-dev"},
+				HeaderName: "X-API-Key",
+			},
+		},
+		{
+			name: "custom API key settings",
+			envVars: map[string]string{
+				"API_KEY_AUTH_ENABLED": "false",
+				"API_KEYS":            "key1,key2,key3",
+				"API_KEY_HEADER":       "Custom-API-Key",
+			},
+			wantConfig: APIKeyConfig{
+				Enabled:    false,
+				Keys:       []string{"key1", "key2", "key3"},
+				HeaderName: "Custom-API-Key",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up environment variables
+			for key, value := range tc.envVars {
+				os.Setenv(key, value)
+			}
+			defer func() {
+				// Clean up environment variables
+				for key := range tc.envVars {
+					os.Unsetenv(key)
+				}
+			}()
+
+			cfg, err := LoadConfig()
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantConfig.Enabled, cfg.APIKey.Enabled)
+			assert.Equal(t, tc.wantConfig.Keys, cfg.APIKey.Keys)
+			assert.Equal(t, tc.wantConfig.HeaderName, cfg.APIKey.HeaderName)
+		})
+	}
 }

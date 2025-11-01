@@ -1,0 +1,13 @@
+{
+  "error": {
+    "code": "$status",
+    "message": "Request processing failed",
+    "details": {
+      "request_id": "$request_id",
+      "timestamp": "$time_iso8601",
+      "method": "$request_method",
+      "uri": "$uri",
+      "remote_addr": "$remote_addr"
+    }
+  }
+}
