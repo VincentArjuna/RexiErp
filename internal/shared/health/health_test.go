@@ -151,7 +151,7 @@ func TestHealthChecker_DetailedHealth(t *testing.T) {
 	assert.Contains(t, response.Checks, "database")
 	assert.Contains(t, response.Checks, "configuration")
 	assert.Contains(t, response.Checks, "system")
-	assert.Contains(t, response.System.GoVersion)
+	assert.Contains(t, response.System.GoVersion, "go")
 }
 
 func TestHealthChecker_ConfigurationCheck(t *testing.T) {

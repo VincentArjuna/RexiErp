@@ -1,8 +1,6 @@
 package health
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
@@ -10,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 
 	"github.com/VincentArjuna/RexiErp/internal/shared/config"
 	"github.com/VincentArjuna/RexiErp/internal/shared/database"
@@ -187,9 +184,6 @@ func (h *HealthChecker) checkDatabase() CheckResult {
 			Message: "Database connection not initialized",
 		}
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	if err := h.db.HealthCheck(); err != nil {
 		h.logger.WithError(err).Error("Database health check failed")

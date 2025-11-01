@@ -76,13 +76,15 @@ func TestDatabase_Configuration(t *testing.T) {
 }
 
 func TestDatabase_GetDSN(t *testing.T) {
-	cfg := &config.DatabaseConfig{
-		Host:     "localhost",
-		Port:     5432,
-		Name:     "test_db",
-		User:     "test_user",
-		Password: "test_pass",
-		SSLMode:  "require",
+	cfg := &config.Config{
+		Database: config.DatabaseConfig{
+			Host:     "localhost",
+			Port:     5432,
+			Name:     "test_db",
+			User:     "test_user",
+			Password: "test_pass",
+			SSLMode:  "require",
+		},
 	}
 
 	expected := "host=localhost port=5432 user=test_user password=test_pass dbname=test_db sslmode=require"
@@ -237,7 +239,8 @@ func TestDatabase_GetTenantDB(t *testing.T) {
 		}
 		defer db.Close()
 
-		tenantDB := db.GetTenantDB("tenant-123")
+		tenantDB, err := db.GetTenantDB("tenant-123")
+		assert.NoError(t, err)
 		assert.NotNil(t, tenantDB)
 	})
 }
