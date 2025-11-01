@@ -15,9 +15,16 @@ scrape_configs:
   # API Gateway
   - job_name: 'api-gateway'
     static_configs:
-      - targets: ['api-gateway:80']
+      - targets: ['api-gateway:8080']
     metrics_path: '/metrics'
     scrape_interval: 15s
+
+  # Nginx Status (stub_status)
+  - job_name: 'nginx-status'
+    static_configs:
+      - targets: ['api-gateway:8080']
+    metrics_path: '/nginx_status'
+    scrape_interval: 30s
 
   # Authentication Service
   - job_name: 'authentication-service'

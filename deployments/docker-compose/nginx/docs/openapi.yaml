@@ -1,0 +1,415 @@
+openapi: 3.0.3
+info:
+  title: RexiERP API
+  description: |
+    Comprehensive API documentation for RexiERP - Indonesian ERP System
+
+    ## Overview
+    This API provides access to all RexiERP business modules including:
+    - Authentication & Authorization
+    - Inventory Management
+    - Accounting & Finance
+    - Human Resources
+    - Customer Relationship Management
+    - Notifications
+    - Third-party Integrations
+
+    ## API Versioning
+    - **Current Version**: v1
+    - **Base URL**: `https://api.rexierp.com/api/v1`
+    - **Authentication**: Bearer Token (JWT)
+
+    ## Request Headers
+    All API requests should include:
+    - `Authorization: Bearer <jwt_token>` (for authenticated endpoints)
+    - `Content-Type: application/json` (for POST/PUT requests)
+    - `X-Request-ID: <unique_id>` (automatically added by gateway)
+
+    ## Rate Limiting
+    - Global: 100 requests/second
+    - Authentication: 10 requests/second
+    - API endpoints: 50 requests/second
+    - Upload operations: 5 requests/second
+
+  version: 1.0.0
+  contact:
+    name: RexiERP API Support
+    email: api-support@rexierp.com
+    url: https://rexierp.com/support
+  license:
+    name: Commercial
+    url: https://rexierp.com/license
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local Development Server
+  - url: https://api.rexierp.com/api/v1
+    description: Production Server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health Check
+      summary: API Gateway Health Check
+      description: Basic health check endpoint for the API gateway
+      responses:
+        '200':
+          description: Gateway is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "healthy\n"
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User Login
+      description: Authenticate user and return JWT token
+      security: []  # No authentication required for login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@company.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123
+                remember_me:
+                  type: boolean
+                  example: false
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                        example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      user:
+                        $ref: '#/components/schemas/User'
+                      expires_at:
+                        type: string
+                        format: date-time
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /inventory/products:
+    get:
+      tags:
+        - Inventory
+      summary: List Products
+      description: Retrieve paginated list of products
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: search
+          in: query
+          description: Search term
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      products:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Product'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+    post:
+      tags:
+        - Inventory
+      summary: Create Product
+      description: Create a new product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 123
+        email:
+          type: string
+          format: email
+          example: user@company.com
+        name:
+          type: string
+          example: John Doe
+        role:
+          type: string
+          example: "admin"
+        tenant_id:
+          type: integer
+          example: 1
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 456
+        sku:
+          type: string
+          example: "PROD-001"
+        name:
+          type: string
+          example: "Laptop Dell XPS 15"
+        description:
+          type: string
+          example: "High-performance laptop for business use"
+        category:
+          type: string
+          example: "Electronics"
+        price:
+          type: number
+          format: decimal
+          example: 1599.99
+        stock_quantity:
+          type: integer
+          example: 50
+        minimum_stock:
+          type: integer
+          example: 10
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProductCreate:
+      type: object
+      required:
+        - sku
+        - name
+        - category
+        - price
+      properties:
+        sku:
+          type: string
+          example: "PROD-001"
+        name:
+          type: string
+          example: "Laptop Dell XPS 15"
+        description:
+          type: string
+          example: "High-performance laptop for business use"
+        category:
+          type: string
+          example: "Electronics"
+        price:
+          type: number
+          format: decimal
+          example: 1599.99
+        stock_quantity:
+          type: integer
+          example: 50
+        minimum_stock:
+          type: integer
+          example: 10
+
+    Pagination:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        total_pages:
+          type: integer
+          example: 8
+        has_next:
+          type: boolean
+          example: true
+        has_prev:
+          type: boolean
+          example: false
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: "VALIDATION_ERROR"
+            message:
+              type: string
+              example: "Request validation failed"
+            details:
+              type: object
+              additionalProperties: true
+            request_id:
+              type: string
+              example: "req_abc123def"
+            timestamp:
+              type: string
+              format: date-time
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login endpoint
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "BAD_REQUEST"
+              message: "Invalid request parameters"
+              request_id: "req_abc123def"
+              timestamp: "2025-11-01T20:00:00Z"
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "UNAUTHORIZED"
+              message: "Authentication required"
+              request_id: "req_abc123def"
+              timestamp: "2025-11-01T20:00:00Z"
+
+    TooManyRequests:
+      description: Too Many Requests
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: "RATE_LIMIT_EXCEEDED"
+              message: "Rate limit exceeded. Please try again later."
+              request_id: "req_abc123def"
+              timestamp: "2025-11-01T20:00:00Z"
+
+tags:
+  - name: Health Check
+    description: API health and status endpoints
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Inventory
+    description: Product and inventory management
+  - name: Accounting
+    description: Financial management and accounting
+  - name: HR
+    description: Human resources and payroll
+  - name: CRM
+    description: Customer relationship management
+  - name: Notifications
+    description: Notification and messaging services
+  - name: Integrations
+    description: Third-party service integrations
