@@ -1,0 +1,199 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "RexiERP - Business Metrics",
+    "tags": ["rexierp", "business", "metrics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Active Users",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(active_users_total)",
+            "legendFormat": "Active Users",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        }
+      },
+      {
+        "id": 2,
+        "title": "Active Tenants",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(active_tenants_total)",
+            "legendFormat": "Active Tenants",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        }
+      },
+      {
+        "id": 3,
+        "title": "Transaction Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(transactions_total[5m]))",
+            "legendFormat": "Transactions/sec",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        }
+      },
+      {
+        "id": 4,
+        "title": "Order Value",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(order_value_total)",
+            "legendFormat": "Total Order Value",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyIDR"
+          }
+        },
+        "gridPos": {
+          "h": 8,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        }
+      },
+      {
+        "id": 5,
+        "title": "User Registrations",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(user_registrations_total[5m])) by (tenant_id)",
+            "legendFormat": "Tenant {{tenant_id}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "reqps"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        }
+      },
+      {
+        "id": 6,
+        "title": "Transaction Volume",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(transactions_total[5m])) by (service)",
+            "legendFormat": "{{service}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "reqps"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        }
+      },
+      {
+        "id": 7,
+        "title": "Inventory Movements",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(inventory_movements_total[5m])) by (movement_type)",
+            "legendFormat": "{{movement_type}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "reqps"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        }
+      },
+      {
+        "id": 8,
+        "title": "API Usage by Tenant",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (tenant_id)",
+            "legendFormat": "Tenant {{tenant_id}}",
+            "refId": "A"
+          }
+        ],
+        "yAxes": [
+          {
+            "unit": "reqps"
+          }
+        ],
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}

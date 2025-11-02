@@ -1,0 +1,138 @@
+groups:
+- name: rexierp.rules
+  rules:
+  # Service Health Alerts
+  - alert: ServiceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Service {{ $labels.job }} is down"
+      description: "Service {{ $labels.job }} has been down for more than 1 minute."
+
+  # High Error Rate Alerts
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate on {{ $labels.job }}"
+      description: "Error rate is {{ $value }} errors per second on {{ $labels.job }}."
+
+  # Response Time Alerts
+  - alert: HighResponseTime
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High response time on {{ $labels.job }}"
+      description: "95th percentile response time is {{ $value }}s on {{ $labels.job }}."
+
+  # Database Alerts
+  - alert: DatabaseConnectionFailure
+    expr: postgres_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection failure"
+      description: "Cannot connect to PostgreSQL database."
+
+  - alert: DatabaseConnectionHigh
+    expr: postgres_stat_activity_count > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High database connections"
+      description: "Database has {{ $value }} active connections."
+
+  # Redis Alerts
+  - alert: RedisDown
+    expr: redis_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis is down"
+      description: "Redis server is not responding."
+
+  - alert: RedisMemoryHigh
+    expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis memory usage high"
+      description: "Redis memory usage is {{ $value | humanizePercentage }}."
+
+  # RabbitMQ Alerts
+  - alert: RabbitMQDown
+    expr: rabbitmq_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "RabbitMQ is down"
+      description: "RabbitMQ server is not responding."
+
+  - alert: RabbitMQQueueMessagesHigh
+    expr: rabbitmq_queue_messages > 1000
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High queue messages"
+      description: "Queue {{ $labels.queue }} has {{ $value }} messages."
+
+  # Disk Space Alerts
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Low disk space"
+      description: "Disk space is {{ $value | humanizePercentage }} full."
+
+  # Memory Alerts
+  - alert: MemoryUsageHigh
+    expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) < 0.1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High memory usage"
+      description: "Memory usage is {{ $value | humanizePercentage }}."
+
+  # CPU Alerts
+  - alert: CPUUsageHigh
+    expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High CPU usage"
+      description: "CPU usage is {{ $value }}%."
+
+  # Container Alerts
+  - alert: ContainerOOMKilled
+    expr: increase(container_oom_events_total[5m]) > 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Container OOM killed"
+      description: "Container {{ $labels.name }} was OOM killed."
+
+  - alert: ContainerRestartHigh
+    expr: increase(container_start_time_seconds[5m]) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Container restarting frequently"
+      description: "Container {{ $labels.name }} has restarted {{ $value }} times in 5 minutes."
