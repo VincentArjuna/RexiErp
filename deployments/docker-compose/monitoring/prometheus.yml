@@ -3,8 +3,7 @@ global:
   evaluation_interval: 15s
 
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  - "rules/*.yml"
 
 scrape_configs:
   # Prometheus itself
@@ -89,4 +88,43 @@ scrape_configs:
   - job_name: 'rabbitmq'
     static_configs:
       - targets: ['rabbitmq:15692']
+    scrape_interval: 30s
+
+  # ELK Stack Metrics
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch:9200']
+    metrics_path: '/_prometheus/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'logstash'
+    static_configs:
+      - targets: ['logstash:9600']
+    metrics_path: '/_node/stats/prometheus'
+    scrape_interval: 30s
+
+  - job_name: 'kibana'
+    static_configs:
+      - targets: ['kibana:5601']
+    metrics_path: '/api/status'
+    scrape_interval: 30s
+
+  # Jaeger Metrics
+  - job_name: 'jaeger-collector'
+    static_configs:
+      - targets: ['jaeger-collector:14269']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'jaeger-query'
+    static_configs:
+      - targets: ['jaeger-query:16687']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # AlertManager
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+    metrics_path: '/metrics'
     scrape_interval: 30s

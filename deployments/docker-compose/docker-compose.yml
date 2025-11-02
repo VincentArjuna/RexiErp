@@ -314,6 +314,7 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     networks:
       - rexi-network
@@ -324,6 +325,21 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: rexi-alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - rexi-network
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
     restart: unless-stopped
 
   grafana:
@@ -342,6 +358,105 @@ services:
       GF_USERS_ALLOW_SIGN_UP: false
     restart: unless-stopped
 
+  # ELK Stack
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: rexi-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - rexi-network
+    restart: unless-stopped
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.15.0
+    container_name: rexi-logstash
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./monitoring/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    networks:
+      - rexi-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    container_name: rexi-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+    volumes:
+      - kibana_data:/usr/share/kibana/data
+    networks:
+      - rexi-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # Jaeger Distributed Tracing
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:1.57
+    container_name: rexi-jaeger-collector
+    ports:
+      - "14269:14269"
+      - "14250:14250"
+      - "14268:14268"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+    networks:
+      - rexi-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  jaeger-query:
+    image: jaegertracing/jaeger-query:1.57
+    container_name: rexi-jaeger-query
+    ports:
+      - "16686:16686"
+      - "16685:16685"
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+      - JAEGER_QUERY_BASE_PATH=/jaeger
+    networks:
+      - rexi-network
+    depends_on:
+      - jaeger-collector
+    restart: unless-stopped
+
+  jaeger-agent:
+    image: jaegertracing/jaeger-agent:1.57
+    container_name: rexi-jaeger-agent
+    ports:
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+    environment:
+      - REPORTER_GRPC_HOST_PORT=jaeger-collector:14250
+    networks:
+      - rexi-network
+    depends_on:
+      - jaeger-collector
+    restart: unless-stopped
+
 volumes:
   postgres_data:
     driver: local
@@ -351,7 +466,13 @@ volumes:
     driver: local
   prometheus_data:
     driver: local
+  alertmanager_data:
+    driver: local
   grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  kibana_data:
     driver: local
 
 networks:
