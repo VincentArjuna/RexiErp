@@ -77,13 +77,16 @@ func TestDatabase_Configuration(t *testing.T) {
 
 func TestDatabase_GetDSN(t *testing.T) {
 	cfg := &config.Config{
-		Database: config.DatabaseConfig{
-			Host:     "localhost",
-			Port:     5432,
-			Name:     "test_db",
-			User:     "test_user",
-			Password: "test_pass",
-			SSLMode:  "require",
+		Databases: config.DatabaseConfigs{
+			Master: config.DatabaseConfig{
+				Type:     "postgres",
+				Host:     "localhost",
+				Port:     5432,
+				Name:     "test_db",
+				User:     "test_user",
+				Password: "test_pass",
+				SSLMode:  "require",
+			},
 		},
 	}
 
@@ -243,4 +246,238 @@ func TestDatabase_GetTenantDB(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, tenantDB)
 	})
+}
+
+// Test enhanced database functionality
+func TestDatabase_ConnectionMetrics(t *testing.T) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	cfg := &config.DatabaseConfig{
+		Host:            "localhost",
+		Port:            5432,
+		Name:            "rexi_erp_test",
+		User:            "rexi",
+		Password:        "password",
+		SSLMode:         "disable",
+		MaxOpenConns:    5,
+		MaxIdleConns:    2,
+		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 1 * time.Minute,
+	}
+
+	t.Run("GetMetrics", func(t *testing.T) {
+		db, err := NewDatabase(cfg, logger)
+		if err != nil {
+			t.Skipf("Skipping test - database not available: %v", err)
+		}
+		defer db.Close()
+
+		metrics := db.GetMetrics()
+		assert.GreaterOrEqual(t, metrics.TotalConnections, int32(0))
+		assert.GreaterOrEqual(t, metrics.ActiveConnections, int32(0))
+		assert.GreaterOrEqual(t, metrics.IdleConnections, int32(0))
+		assert.GreaterOrEqual(t, metrics.WaitCount, int64(0))
+		assert.GreaterOrEqual(t, metrics.WaitDuration, time.Duration(0))
+	})
+
+	t.Run("HealthMonitoring", func(t *testing.T) {
+		db, err := NewDatabase(cfg, logger)
+		if err != nil {
+			t.Skipf("Skipping test - database not available: %v", err)
+		}
+		defer db.Close()
+
+		// Give some time for health monitoring to start
+		time.Sleep(100 * time.Millisecond)
+
+		err = db.HealthCheck()
+		assert.NoError(t, err)
+	})
+}
+
+func TestDatabase_ReadReplicas(t *testing.T) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	masterCfg := &config.DatabaseConfig{
+		Host:            "localhost",
+		Port:            5432,
+		Name:            "rexi_erp_test",
+		User:            "rexi",
+		Password:        "password",
+		SSLMode:         "disable",
+		MaxOpenConns:    5,
+		MaxIdleConns:    2,
+		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 1 * time.Minute,
+	}
+
+	t.Run("AddReadReplica", func(t *testing.T) {
+		db, err := NewDatabase(masterCfg, logger)
+		if err != nil {
+			t.Skipf("Skipping test - database not available: %v", err)
+		}
+		defer db.Close()
+
+		// Test adding a replica (using same config for simplicity)
+		err = db.AddReadReplica(masterCfg)
+		if err != nil {
+			t.Skipf("Skipping replica test - replica database not available: %v", err)
+		}
+
+		// Test getting read replica
+		replica := db.GetReadReplica()
+		assert.NotNil(t, replica)
+
+		// Test multiple calls to ensure round-robin
+		replica2 := db.GetReadReplica()
+		assert.NotNil(t, replica2)
+	})
+
+	t.Run("NoReplicasFallback", func(t *testing.T) {
+		db, err := NewDatabase(masterCfg, logger)
+		if err != nil {
+			t.Skipf("Skipping test - database not available: %v", err)
+		}
+		defer db.Close()
+
+		// Should return master when no replicas
+		replica := db.GetReadReplica()
+		assert.NotNil(t, replica)
+	})
+}
+
+func TestDatabase_GracefulShutdown(t *testing.T) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	cfg := &config.DatabaseConfig{
+		Host:            "localhost",
+		Port:            5432,
+		Name:            "rexi_erp_test",
+		User:            "rexi",
+		Password:        "password",
+		SSLMode:         "disable",
+		MaxOpenConns:    5,
+		MaxIdleConns:    2,
+		ConnMaxLifetime: 5 * time.Minute,
+		ConnMaxIdleTime: 1 * time.Minute,
+	}
+
+	t.Run("GracefulClose", func(t *testing.T) {
+		db, err := NewDatabase(cfg, logger)
+		if err != nil {
+			t.Skipf("Skipping test - database not available: %v", err)
+		}
+
+		// Add a replica
+		replicaCfg := *cfg
+		err = db.AddReadReplica(&replicaCfg)
+		if err != nil {
+			t.Skipf("Skipping replica test: %v", err)
+		}
+
+		// Test graceful shutdown
+		err = db.Close()
+		assert.NoError(t, err)
+
+		// Test double close (should not panic)
+		err = db.Close()
+		assert.NoError(t, err)
+	})
+}
+
+// Performance benchmarks
+func BenchmarkDatabase_HealthCheck(b *testing.B) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	cfg := &config.DatabaseConfig{
+		Host:            "localhost",
+		Port:            5432,
+		Name:            "rexi_erp_test",
+		User:            "rexi",
+		Password:        "password",
+		SSLMode:         "disable",
+		MaxOpenConns:    50,
+		MaxIdleConns:    10,
+		ConnMaxLifetime: 1 * time.Hour,
+		ConnMaxIdleTime: 30 * time.Minute,
+	}
+
+	db, err := NewDatabase(cfg, logger)
+	if err != nil {
+		b.Skipf("Skipping benchmark - database not available: %v", err)
+	}
+	defer db.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		db.HealthCheck()
+	}
+}
+
+func BenchmarkDatabase_GetMetrics(b *testing.B) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	cfg := &config.DatabaseConfig{
+		Host:            "localhost",
+		Port:            5432,
+		Name:            "rexi_erp_test",
+		User:            "rexi",
+		Password:        "password",
+		SSLMode:         "disable",
+		MaxOpenConns:    50,
+		MaxIdleConns:    10,
+		ConnMaxLifetime: 1 * time.Hour,
+		ConnMaxIdleTime: 30 * time.Minute,
+	}
+
+	db, err := NewDatabase(cfg, logger)
+	if err != nil {
+		b.Skipf("Skipping benchmark - database not available: %v", err)
+	}
+	defer db.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = db.GetMetrics()
+	}
+}
+
+func BenchmarkDatabase_GetReadReplica(b *testing.B) {
+	logger := logrus.New()
+	logger.SetLevel(logrus.ErrorLevel)
+
+	cfg := &config.DatabaseConfig{
+		Host:            "localhost",
+		Port:            5432,
+		Name:            "rexi_erp_test",
+		User:            "rexi",
+		Password:        "password",
+		SSLMode:         "disable",
+		MaxOpenConns:    50,
+		MaxIdleConns:    10,
+		ConnMaxLifetime: 1 * time.Hour,
+		ConnMaxIdleTime: 30 * time.Minute,
+	}
+
+	db, err := NewDatabase(cfg, logger)
+	if err != nil {
+		b.Skipf("Skipping benchmark - database not available: %v", err)
+	}
+	defer db.Close()
+
+	// Add multiple replicas for round-robin testing
+	for i := 0; i < 3; i++ {
+		replicaCfg := *cfg
+		_ = db.AddReadReplica(&replicaCfg) // Ignore errors for benchmark
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = db.GetReadReplica()
+	}
 }
