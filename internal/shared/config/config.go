@@ -12,13 +12,14 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	App      AppConfig      `yaml:"app"`
-	Database DatabaseConfig `yaml:"database"`
-	Redis    RedisConfig    `yaml:"redis"`
-	RabbitMQ RabbitMQConfig `yaml:"rabbitmq"`
-	JWT      JWTConfig      `yaml:"jwt"`
-	APIKey   APIKeyConfig   `yaml:"api_key"`
-	Log      LogConfig      `yaml:"log"`
+	App        AppConfig        `yaml:"app"`
+	Databases  DatabaseConfigs  `yaml:"databases"`
+	Redis      RedisConfig      `yaml:"redis"`
+	MinIO      MinIOConfig      `yaml:"minio"`
+	RabbitMQ   RabbitMQConfig   `yaml:"rabbitmq"`
+	JWT        JWTConfig        `yaml:"jwt"`
+	APIKey     APIKeyConfig     `yaml:"api_key"`
+	Log        LogConfig        `yaml:"log"`
 	Monitoring MonitoringConfig `yaml:"monitoring"`
 }
 
@@ -33,28 +34,85 @@ type AppConfig struct {
 	Timezone    string `yaml:"timezone"`
 }
 
-// DatabaseConfig represents database configuration
+// DatabaseType represents the type of database
+type DatabaseType string
+
+const (
+	DatabaseTypePostgreSQL DatabaseType = "postgresql"
+	DatabaseTypeMySQL      DatabaseType = "mysql"
+	DatabaseTypeSQLite     DatabaseType = "sqlite"
+)
+
+// DatabaseConfig represents a single database configuration
 type DatabaseConfig struct {
-	Host            string        `yaml:"host"`
-	Port            int           `yaml:"port"`
-	Name            string        `yaml:"name"`
-	User            string        `yaml:"user"`
-	Password        string        `yaml:"password"`
-	SSLMode         string        `yaml:"ssl_mode"`
-	MaxOpenConns    int           `yaml:"max_open_conns"`
-	MaxIdleConns    int           `yaml:"max_idle_conns"`
+	Type            DatabaseType `yaml:"type"`
+	Name            string       `yaml:"name"`
+	Host            string       `yaml:"host"`
+	Port            int          `yaml:"port"`
+	User            string       `yaml:"user"`
+	Password        string       `yaml:"password"`
+	SSLMode         string       `yaml:"ssl_mode"`
+	MaxOpenConns    int          `yaml:"max_open_conns"`
+	MaxIdleConns    int          `yaml:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `yaml:"conn_max_idle_time"`
+	IsMaster        bool         `yaml:"is_master"`
+	Weight          int          `yaml:"weight"`
+	Enabled         bool         `yaml:"enabled"`
 }
 
-// RedisConfig represents Redis configuration
-type RedisConfig struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Password string `yaml:"password"`
-	DB       int    `yaml:"db"`
-	PoolSize int    `yaml:"pool_size"`
+// DatabaseConfigs represents multiple database configurations
+type DatabaseConfigs struct {
+	Master  DatabaseConfig   `yaml:"master"`
+	Replicas []DatabaseConfig `yaml:"replicas"`
 }
+
+// RedisClusterConfig represents Redis cluster configuration
+type RedisClusterConfig struct {
+	Enabled  bool     `yaml:"enabled"`
+	Nodes    []string `yaml:"nodes"`
+	Password string   `yaml:"password"`
+}
+
+// RedisSentinelConfig represents Redis sentinel configuration
+type RedisSentinelConfig struct {
+	Enabled  bool     `yaml:"enabled"`
+	Master   string   `yaml:"master"`
+	Nodes    []string `yaml:"nodes"`
+	Password string   `yaml:"password"`
+}
+
+// RedisConfig represents enhanced Redis configuration
+type RedisConfig struct {
+	Host       string               `yaml:"host"`
+	Port       int                  `yaml:"port"`
+	Password   string               `yaml:"password"`
+	DB         int                  `yaml:"db"`
+	PoolSize   int                  `yaml:"pool_size"`
+	MinIdleConns int                `yaml:"min_idle_conns"`
+	MaxRetries  int                 `yaml:"max_retries"`
+	DialTimeout time.Duration       `yaml:"dial_timeout"`
+	ReadTimeout time.Duration       `yaml:"read_timeout"`
+	WriteTimeout time.Duration      `yaml:"write_timeout"`
+	PoolTimeout time.Duration       `yaml:"pool_timeout"`
+	IdleTimeout time.Duration       `yaml:"idle_timeout"`
+	IdleCheckFrequency time.Duration `yaml:"idle_check_frequency"`
+	Cluster    RedisClusterConfig   `yaml:"cluster"`
+	Sentinel   RedisSentinelConfig  `yaml:"sentinel"`
+}
+
+// MinIOConfig represents MinIO object storage configuration
+type MinIOConfig struct {
+	Endpoint        string        `yaml:"endpoint"`
+	AccessKeyID     string        `yaml:"access_key_id"`
+	SecretAccessKey string        `yaml:"secret_access_key"`
+	UseSSL          bool          `yaml:"use_ssl"`
+	Region          string        `yaml:"region"`
+	Bucket          string        `yaml:"bucket"`
+	Timeout         time.Duration `yaml:"timeout"`
+	RetryAttempts   int           `yaml:"retry_attempts"`
+}
+
 
 // RabbitMQConfig represents RabbitMQ configuration
 type RabbitMQConfig struct {
@@ -87,6 +145,31 @@ type APIKeyConfig struct {
 
 // Validate validates the database configuration
 func (c *DatabaseConfig) Validate() error {
+	// Validate database type
+	switch c.Type {
+	case DatabaseTypePostgreSQL, DatabaseTypeMySQL, DatabaseTypeSQLite:
+	default:
+		return fmt.Errorf("unsupported database type: %s", c.Type)
+	}
+
+	// Skip host/port validation for SQLite
+	if c.Type != DatabaseTypeSQLite {
+		if c.Host == "" {
+			return fmt.Errorf("database host is required for %s", c.Type)
+		}
+		if c.Port < 1 || c.Port > 65535 {
+			return fmt.Errorf("invalid database port: %d", c.Port)
+		}
+	}
+
+	// Validate required fields
+	if c.Name == "" {
+		return fmt.Errorf("database name is required")
+	}
+	if c.User == "" && c.Type != DatabaseTypeSQLite {
+		return fmt.Errorf("database user is required for %s", c.Type)
+	}
+
 	// Validate connection pool settings
 	if c.MaxOpenConns <= 0 {
 		return fmt.Errorf("max open connections must be greater than 0")
@@ -115,6 +198,102 @@ func (c *DatabaseConfig) Validate() error {
 	}
 	if c.ConnMaxIdleTime > c.ConnMaxLifetime {
 		return fmt.Errorf("connection max idle time (%v) cannot be greater than connection max lifetime (%v)", c.ConnMaxIdleTime, c.ConnMaxLifetime)
+	}
+
+	return nil
+}
+
+// Validate validates the database configurations
+func (dc *DatabaseConfigs) Validate() error {
+	// Validate master database
+	if err := dc.Master.Validate(); err != nil {
+		return fmt.Errorf("master database validation failed: %w", err)
+	}
+
+	// Validate replicas
+	for i, replica := range dc.Replicas {
+		if err := replica.Validate(); err != nil {
+			return fmt.Errorf("replica database %d validation failed: %w", i+1, err)
+		}
+		if replica.Type != dc.Master.Type {
+			return fmt.Errorf("replica database %d type (%s) must match master type (%s)", i+1, replica.Type, dc.Master.Type)
+		}
+	}
+
+	return nil
+}
+
+// Validate validates the Redis configuration
+func (c *RedisConfig) Validate() error {
+	// Validate basic configuration
+	if c.Host == "" && !c.Cluster.Enabled && !c.Sentinel.Enabled {
+		return fmt.Errorf("Redis host is required when cluster and sentinel are disabled")
+	}
+
+	if c.Port < 1 || c.Port > 65535 {
+		return fmt.Errorf("invalid Redis port: %d", c.Port)
+	}
+
+	// Validate cluster configuration
+	if c.Cluster.Enabled {
+		if len(c.Cluster.Nodes) == 0 {
+			return fmt.Errorf("Redis cluster nodes are required when cluster is enabled")
+		}
+		for _, node := range c.Cluster.Nodes {
+			if node == "" {
+				return fmt.Errorf("Redis cluster node cannot be empty")
+			}
+		}
+	}
+
+	// Validate sentinel configuration
+	if c.Sentinel.Enabled {
+		if c.Sentinel.Master == "" {
+			return fmt.Errorf("Redis sentinel master name is required when sentinel is enabled")
+		}
+		if len(c.Sentinel.Nodes) == 0 {
+			return fmt.Errorf("Redis sentinel nodes are required when sentinel is enabled")
+		}
+		for _, node := range c.Sentinel.Nodes {
+			if node == "" {
+				return fmt.Errorf("Redis sentinel node cannot be empty")
+			}
+		}
+	}
+
+	// Validate connection pool settings
+	if c.PoolSize <= 0 {
+		return fmt.Errorf("Redis pool size must be greater than 0")
+	}
+	if c.MinIdleConns < 0 {
+		return fmt.Errorf("Redis min idle connections cannot be negative")
+	}
+	if c.MinIdleConns > c.PoolSize {
+		return fmt.Errorf("Redis min idle connections (%d) cannot be greater than pool size (%d)", c.MinIdleConns, c.PoolSize)
+	}
+
+	return nil
+}
+
+// Validate validates the MinIO configuration
+func (c *MinIOConfig) Validate() error {
+	if c.Endpoint == "" {
+		return fmt.Errorf("MinIO endpoint is required")
+	}
+	if c.AccessKeyID == "" {
+		return fmt.Errorf("MinIO access key ID is required")
+	}
+	if c.SecretAccessKey == "" {
+		return fmt.Errorf("MinIO secret access key is required")
+	}
+	if c.Bucket == "" {
+		return fmt.Errorf("MinIO bucket name is required")
+	}
+	if c.Timeout <= 0 {
+		return fmt.Errorf("MinIO timeout must be greater than 0")
+	}
+	if c.RetryAttempts < 0 {
+		return fmt.Errorf("MinIO retry attempts cannot be negative")
 	}
 
 	return nil
@@ -151,17 +330,21 @@ func LoadConfig() (*Config, error) {
 			Port:        getEnvInt("APP_PORT", 8000),
 			Timezone:    getEnv("TZ", "Asia/Jakarta"),
 		},
-		Database: DatabaseConfig{
-			Host:            getEnv("DB_HOST", "localhost"),
-			Port:            getEnvInt("DB_PORT", 5432),
-			Name:            getEnv("DB_NAME", "rexi_erp"),
-			User:            getEnv("DB_USER", "rexi"),
-			Password:        getEnv("DB_PASSWORD", "password"),
-			SSLMode:         getEnv("DB_SSL_MODE", "disable"),
-			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNECTIONS", 50),
-			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNECTIONS", 10),
-			ConnMaxLifetime: getEnvDuration("DB_CONNECTION_MAX_LIFETIME", 1*time.Hour),
-			ConnMaxIdleTime: getEnvDuration("DB_CONNECTION_MAX_IDLE_TIME", 30*time.Minute),
+		Databases: DatabaseConfigs{
+			Master: DatabaseConfig{
+				Type:            DatabaseTypePostgreSQL,
+				Host:            getEnv("DB_HOST", "localhost"),
+				Port:            getEnvInt("DB_PORT", 5432),
+				Name:            getEnv("DB_NAME", "rexi_erp"),
+				User:            getEnv("DB_USER", "rexi"),
+				Password:        getEnv("DB_PASSWORD", "password"),
+				SSLMode:         getEnv("DB_SSL_MODE", "disable"),
+				MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNECTIONS", 50),
+				MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNECTIONS", 10),
+				ConnMaxLifetime: getEnvDuration("DB_CONNECTION_MAX_LIFETIME", 1*time.Hour),
+				ConnMaxIdleTime: getEnvDuration("DB_CONNECTION_MAX_IDLE_TIME", 30*time.Minute),
+				IsMaster:        true,
+			},
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "localhost"),
@@ -221,13 +404,13 @@ func LoadConfig() (*Config, error) {
 // validate validates the configuration
 func (c *Config) validate() error {
 	// Validate required fields
-	if c.Database.Host == "" {
+	if c.Databases.Master.Host == "" {
 		return fmt.Errorf("database host is required")
 	}
-	if c.Database.Name == "" {
+	if c.Databases.Master.Name == "" {
 		return fmt.Errorf("database name is required")
 	}
-	if c.Database.User == "" {
+	if c.Databases.Master.User == "" {
 		return fmt.Errorf("database user is required")
 	}
 	if c.JWT.Secret == "" {
@@ -241,8 +424,8 @@ func (c *Config) validate() error {
 	if c.App.Port < 1 || c.App.Port > 65535 {
 		return fmt.Errorf("invalid application port: %d", c.App.Port)
 	}
-	if c.Database.Port < 1 || c.Database.Port > 65535 {
-		return fmt.Errorf("invalid database port: %d", c.Database.Port)
+	if c.Databases.Master.Port < 1 || c.Databases.Master.Port > 65535 {
+		return fmt.Errorf("invalid database port: %d", c.Databases.Master.Port)
 	}
 	if c.Redis.Port < 1 || c.Redis.Port > 65535 {
 		return fmt.Errorf("invalid redis port: %d", c.Redis.Port)
@@ -252,7 +435,7 @@ func (c *Config) validate() error {
 	}
 
 	// Validate database connection settings
-	if err := c.Database.Validate(); err != nil {
+	if err := c.Databases.Validate(); err != nil {
 		return fmt.Errorf("database configuration validation failed: %w", err)
 	}
 
@@ -262,12 +445,12 @@ func (c *Config) validate() error {
 // GetDSN returns the database connection string
 func (c *Config) GetDSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
-		c.Database.Host,
-		c.Database.Port,
-		c.Database.User,
-		c.Database.Password,
-		c.Database.Name,
-		c.Database.SSLMode,
+		c.Databases.Master.Host,
+		c.Databases.Master.Port,
+		c.Databases.Master.User,
+		c.Databases.Master.Password,
+		c.Databases.Master.Name,
+		c.Databases.Master.SSLMode,
 	)
 }
 
